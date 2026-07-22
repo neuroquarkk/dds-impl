@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:18.4
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: envsync_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d envsync_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+
+  volume_setup:
+    image: busybox:1.38.0
+    command: sh -c "chown -R 65532:65532 /shared"
+    volumes:
+      - shared_data:/shared
+
+  toy:
+    build:
+      context: .
+      args:
+        APP_NAME: toy
+    command: ["-env-file", "/shared/.env", "-pid-file", "/shared/app.pid"]
+    volumes:
+      - shared_data:/shared
+    depends_on:
+      db:
+        condition: service_healthy
+      volume_setup:
+        condition: service_completed_successfully
+
+  envsync:
+    build:
+      context: .
+      args:
+        APP_NAME: envsync
+    pid: "service:toy"
+    command:
+      [
+        "-env-file",
+        "/shared/.env",
+        "-pid-file",
+        "/shared/app.pid",
+        "-dsn",
+        "postgres://postgres:postgres@db:5432/envsync_db?sslmode=disable",
+      ]
+    volumes:
+      - shared_data:/shared
+    depends_on:
+      db:
+        condition: service_healthy
+      toy:
+        condition: service_started
+      volume_setup:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  shared_data:
