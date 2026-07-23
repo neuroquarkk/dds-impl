@@ -1,0 +1,37 @@
+services:
+  ambassador:
+    build:
+      context: .
+      args:
+        APP_NAME: ambassador
+    command: ["-port", "8081", "-v1", "8082", "-v2", "8083"]
+
+  v1:
+    build:
+      context: .
+      args:
+        APP_NAME: v1
+    command: ["-port", "8082"]
+    network_mode: "service:ambassador"
+    depends_on:
+      - ambassador
+
+  v2:
+    build:
+      context: .
+      args:
+        APP_NAME: v2
+    command: ["-port", "8083"]
+    network_mode: "service:ambassador"
+    depends_on:
+      - ambassador
+
+  client:
+    build:
+      context: .
+      args:
+        APP_NAME: client
+    command: ["-port", "8081"]
+    network_mode: "service:ambassador"
+    depends_on:
+      - ambassador
